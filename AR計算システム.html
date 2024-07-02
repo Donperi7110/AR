@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>結晶のAR値計算システム</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #resultsArea {
+            margin-top: 20px;
+            background-color: #e8f4f8;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>結晶のAR値計算システム</h1>
+        <div>
+            <label for="bulkInput">結晶の長軸と短軸の値を入力してください（スペース区切りで入力）:</label>
+            <input type="text" id="bulkInput" placeholder="例：10.5 5.2 8.7 4.1 12.3 6.8">
+            <button onclick="calculateAR()">ARを計算</button>
+            <button onclick="exportToCSV()">CSVに出力</button>
+        </div>
+        <div id="resultsArea"></div>
+    </div>
+    <script>
+        let globalResults = [];
+
+        function calculateAR() {
+            const input = document.getElementById('bulkInput').value;
+            const values = input.trim().split(/\s+/).map(Number);
+            const ARValues = [];
+            const longAxisValues = [];
+            const shortAxisValues = [];
+            let totalAR = 0;
+
+            const resultsArea = document.getElementById('resultsArea');
+            resultsArea.innerHTML = '<h2>結果</h2>';
+
+            let tableHTML = '<table><tr><th>結晶番号</th><th>長軸</th><th>短軸</th><th>AR</th></tr>';
+
+            for (let i = 0; i < values.length; i += 2) {
+                const longAxis = values[i];
+                const shortAxis = values[i + 1];
+                
+                if (isNaN(longAxis) || isNaN(shortAxis) || shortAxis === 0) {
+                    tableHTML += `<tr><td>${(i/2) + 1}</td><td colspan="3">無効なデータ</td></tr>`;
+                    continue;
+                }
+                
+                const AR = longAxis / shortAxis;
+                ARValues.push(AR);
+                longAxisValues.push(longAxis);
+                shortAxisValues.push(shortAxis);
+                totalAR += AR;
+
+                tableHTML += `<tr><td>${(i/2) + 1}</td><td>${longAxis.toFixed(3)}</td><td>${shortAxis.toFixed(3)}</td><td>${AR.toFixed(3)}</td></tr>`;
+            }
+
+            tableHTML += '</table>';
+            resultsArea.innerHTML += tableHTML;
+
+            if (ARValues.length > 0) {
+                const stats = calculateStats(ARValues, longAxisValues, shortAxisValues);
+                resultsArea.innerHTML += `
+                    <h3>統計情報</h3>
+                    <p><strong>AR平均値:</strong> ${stats.arMean.toFixed(3)}</p>
+                    <p><strong>AR標準偏差:</strong> ${stats.arStdDev.toFixed(3)}</p>
+                    <p><strong>ARCV値:</strong> ${stats.arCV.toFixed(3)}%</p>
+                    <p><strong>長軸平均粒径:</strong> ${stats.longAxisMean.toFixed(3)}</p>
+                    <p><strong>長軸標準偏差:</strong> ${stats.longAxisStdDev.toFixed(3)}</p>
+                    <p><strong>長軸CV値:</strong> ${stats.longAxisCV.toFixed(3)}%</p>
+                    <p><strong>短軸平均粒径:</strong> ${stats.shortAxisMean.toFixed(3)}</p>
+                    <p><strong>短軸標準偏差:</strong> ${stats.shortAxisStdDev.toFixed(3)}</p>
+                    <p><strong>短軸CV値:</strong> ${stats.shortAxisCV.toFixed(3)}%</p>
+                `;
+
+                globalResults = ARValues.map((ar, index) => ({
+                    crystalNumber: index + 1,
+                    longAxis: longAxisValues[index],
+                    shortAxis: shortAxisValues[index],
+                    ar: ar
+                }));
+                globalResults.push(stats);
+            } else {
+                resultsArea.innerHTML += '<p>有効なデータがありません。</p>';
+            }
+        }
+
+        function calculateStats(arValues, longAxisValues, shortAxisValues) {
+            const arMean = arValues.reduce((a, b) => a + b) / arValues.length;
+            const longAxisMean = longAxisValues.reduce((a, b) => a + b) / longAxisValues.length;
+            const shortAxisMean = shortAxisValues.reduce((a, b) => a + b) / shortAxisValues.length;
+
+            const arVariance = arValues.reduce((sum, x) => sum + Math.pow(x - arMean, 2), 0) / arValues.length;
+            const longAxisVariance = longAxisValues.reduce((sum, x) => sum + Math.pow(x - longAxisMean, 2), 0) / longAxisValues.length;
+            const shortAxisVariance = shortAxisValues.reduce((sum, x) => sum + Math.pow(x - shortAxisMean, 2), 0) / shortAxisValues.length;
+
+            const arStdDev = Math.sqrt(arVariance);
+            const longAxisStdDev = Math.sqrt(longAxisVariance);
+            const shortAxisStdDev = Math.sqrt(shortAxisVariance);
+
+            const arCV = (arStdDev / arMean) * 100;
+            const longAxisCV = (longAxisStdDev / longAxisMean) * 100;
+            const shortAxisCV = (shortAxisStdDev / shortAxisMean) * 100;
+
+            return {
+                arMean, arStdDev, arCV,
+                longAxisMean, longAxisStdDev, longAxisCV,
+                shortAxisMean, shortAxisStdDev, shortAxisCV
+            };
+        }
+
+        function exportToCSV() {
+            if (globalResults.length === 0) {
+                alert('データがありません。先に計算を実行してください。');
+                return;
+            }
+
+            let csvContent = "\uFEFFデータ番号,長軸,短軸,AR\n";
+            
+            globalResults.forEach((row, index) => {
+                if (index < globalResults.length - 1) {
+                    csvContent += `${row.crystalNumber},${row.longAxis.toFixed(3)},${row.shortAxis.toFixed(3)},${row.ar.toFixed(3)}\n`;
+                } else {
+                    csvContent += "\n統計情報\n";
+                    csvContent += `AR平均値,${row.arMean.toFixed(3)}\n`;
+                    csvContent += `AR標準偏差,${row.arStdDev.toFixed(3)}\n`;
+                    csvContent += `ARCV値,%,${row.arCV.toFixed(3)}\n`;
+                    csvContent += `長軸平均粒径,${row.longAxisMean.toFixed(3)}\n`;
+                    csvContent += `長軸標準偏差,${row.longAxisStdDev.toFixed(3)}\n`;
+                    csvContent += `長軸CV値,%,${row.longAxisCV.toFixed(3)}\n`;
+                    csvContent += `短軸平均粒径,${row.shortAxisMean.toFixed(3)}\n`;
+                    csvContent += `短軸標準偏差,${row.shortAxisStdDev.toFixed(3)}\n`;
+                    csvContent += `短軸CV値,%,${row.shortAxisCV.toFixed(3)}\n`;
+                }
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", "crystal_data.csv");
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    </script>
+</body>
+</html>
+
