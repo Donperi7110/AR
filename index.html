@@ -28,7 +28,7 @@
             display: block;
             margin-bottom: 5px;
         }
-        input[type="text"] {
+        input[type="text"], input[type="number"] {
             width: 100%;
             padding: 8px;
             margin-bottom: 10px;
@@ -80,13 +80,19 @@
             <button onclick="exportToCSV()">CSVに出力</button>
         </div>
         <div id="resultsArea"></div>
+        <div id="recalculateArea" style="display: none;">
+            <label for="numCrystals">計算する結晶の個数を入力してください:</label>
+            <input type="number" id="numCrystals" min="1">
+            <button onclick="recalculateAR()">再計算</button>
+        </div>
     </div>
     <script>
         let globalResults = [];
+        let values = [];
 
         function calculateAR() {
             const input = document.getElementById('bulkInput').value;
-            const values = input.trim().split(/\s+/).map(Number);
+            values = input.trim().split(/\s+/).map(Number);
             const ARValues = [];
             const longAxisValues = [];
             const shortAxisValues = [];
@@ -98,6 +104,74 @@
             let tableHTML = '<table><tr><th>結晶番号</th><th>長軸</th><th>短軸</th><th>AR</th></tr>';
 
             for (let i = 0; i < values.length; i += 2) {
+                const longAxis = values[i];
+                const shortAxis = values[i + 1];
+                
+                if (isNaN(longAxis) || isNaN(shortAxis) || shortAxis === 0) {
+                    tableHTML += `<tr><td>${(i/2) + 1}</td><td colspan="3">無効なデータ</td></tr>`;
+                    continue;
+                }
+                
+                const AR = longAxis / shortAxis;
+                ARValues.push(AR);
+                longAxisValues.push(longAxis);
+                shortAxisValues.push(shortAxis);
+                totalAR += AR;
+
+                tableHTML += `<tr><td>${(i/2) + 1}</td><td>${longAxis.toFixed(3)}</td><td>${shortAxis.toFixed(3)}</td><td>${AR.toFixed(3)}</td></tr>`;
+            }
+
+            tableHTML += '</table>';
+            resultsArea.innerHTML += tableHTML;
+
+            if (ARValues.length > 0) {
+                const stats = calculateStats(ARValues, longAxisValues, shortAxisValues);
+                resultsArea.innerHTML += `
+                    <h3>統計情報</h3>
+                    <p><strong>AR平均値:</strong> ${stats.arMean.toFixed(3)}</p>
+                    <p><strong>AR標準偏差:</strong> ${stats.arStdDev.toFixed(3)}</p>
+                    <p><strong>ARCV値:</strong> ${stats.arCV.toFixed(3)}%</p>
+                    <p><strong>長軸平均粒径:</strong> ${stats.longAxisMean.toFixed(3)}</p>
+                    <p><strong>長軸標準偏差:</strong> ${stats.longAxisStdDev.toFixed(3)}</p>
+                    <p><strong>長軸CV値:</strong> ${stats.longAxisCV.toFixed(3)}%</p>
+                    <p><strong>短軸平均粒径:</strong> ${stats.shortAxisMean.toFixed(3)}</p>
+                    <p><strong>短軸標準偏差:</strong> ${stats.shortAxisStdDev.toFixed(3)}</p>
+                    <p><strong>短軸CV値:</strong> ${stats.shortAxisCV.toFixed(3)}%</p>
+                `;
+
+                globalResults = ARValues.map((ar, index) => ({
+                    crystalNumber: index + 1,
+                    longAxis: longAxisValues[index],
+                    shortAxis: shortAxisValues[index],
+                    ar: ar
+                }));
+                globalResults.push(stats);
+
+                document.getElementById('recalculateArea').style.display = 'block';
+            } else {
+                resultsArea.innerHTML += '<p>有効なデータがありません。</p>';
+                document.getElementById('recalculateArea').style.display = 'none';
+            }
+        }
+
+        function recalculateAR() {
+            const numCrystals = parseInt(document.getElementById('numCrystals').value);
+            if (isNaN(numCrystals) || numCrystals <= 0 || numCrystals > values.length / 2) {
+                alert('有効な結晶の個数を入力してください。');
+                return;
+            }
+
+            const ARValues = [];
+            const longAxisValues = [];
+            const shortAxisValues = [];
+            let totalAR = 0;
+
+            const resultsArea = document.getElementById('resultsArea');
+            resultsArea.innerHTML = '<h2>結果</h2>';
+
+            let tableHTML = '<table><tr><th>結晶番号</th><th>長軸</th><th>短軸</th><th>AR</th></tr>';
+
+            for (let i = 0; i < numCrystals * 2; i += 2) {
                 const longAxis = values[i];
                 const shortAxis = values[i + 1];
                 
@@ -176,7 +250,7 @@
             }
 
             let csvContent = "\uFEFFデータ番号,長軸,短軸,AR\n";
-            
+
             globalResults.forEach((row, index) => {
                 if (index < globalResults.length - 1) {
                     csvContent += `${row.crystalNumber},${row.longAxis.toFixed(3)},${row.shortAxis.toFixed(3)},${row.ar.toFixed(3)}\n`;
