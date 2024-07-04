@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>結晶のAR値計算システム</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -34,7 +36,7 @@
             margin-bottom: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            height: 100px; /* テキストエリアの高さを指定 */
+            height: 100px;
         }
         button {
             background-color: #3498db;
@@ -78,7 +80,7 @@
             <label for="bulkInput">結晶の長軸と短軸の値を入力してください（スペース区切りで入力）:</label>
             <textarea id="bulkInput" placeholder="例：10.5 5.2 8.7 4.1 12.3 6.8"></textarea>
             <button onclick="calculateAR()">ARを計算</button>
-            <button onclick="exportToCSV()">CSVに出力</button>
+            <button onclick="exportToXLSX()">Excelに出力</button>
         </div>
         <div id="resultsArea"></div>
         <div id="recalculateArea" style="display: none;">
@@ -244,44 +246,43 @@
             };
         }
 
-        function exportToCSV() {
+        async function exportToXLSX() {
             if (globalResults.length === 0) {
                 alert('データがありません。先に計算を実行してください。');
                 return;
             }
 
-            let csvContent = "\uFEFFデータ番号,長軸,短軸,AR\n";
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('結晶データ');
 
+            // ヘッダー行を追加
+            worksheet.addRow(['データ番号', '長軸', '短軸', 'AR']);
+
+            // データ行を追加
             globalResults.forEach((row, index) => {
                 if (index < globalResults.length - 1) {
-                    csvContent += `${row.crystalNumber},${row.longAxis.toFixed(3)},${row.shortAxis.toFixed(3)},${row.ar.toFixed(3)}\n`;
-                } else {
-                    csvContent += "\n統計情報\n";
-                    csvContent += `AR平均値,${row.arMean.toFixed(3)}\n`;
-                    csvContent += `AR標準偏差,${row.arStdDev.toFixed(3)}\n`;
-                    csvContent += `ARCV値,%,${row.arCV.toFixed(3)}\n`;
-                    csvContent += `長軸平均粒径,${row.longAxisMean.toFixed(3)}\n`;
-                    csvContent += `長軸標準偏差,${row.longAxisStdDev.toFixed(3)}\n`;
-                    csvContent += `長軸CV値,%,${row.longAxisCV.toFixed(3)}\n`;
-                    csvContent += `短軸平均粒径,${row.shortAxisMean.toFixed(3)}\n`;
-                    csvContent += `短軸標準偏差,${row.shortAxisStdDev.toFixed(3)}\n`;
-                    csvContent += `短軸CV値,%,${row.shortAxisCV.toFixed(3)}\n`;
+                    worksheet.addRow([row.crystalNumber, row.longAxis, row.shortAxis, row.ar]);
                 }
             });
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            if (link.download !== undefined) {
-                const url = URL.createObjectURL(blob);
-                link.setAttribute("href", url);
-                link.setAttribute("download", "crystal_data.csv");
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            }
+            // 統計情報を追加
+            const stats = globalResults[globalResults.length - 1];
+            worksheet.addRow([]);
+            worksheet.addRow(['統計情報']);
+            worksheet.addRow(['AR平均値', stats.arMean]);
+            worksheet.addRow(['AR標準偏差', stats.arStdDev]);
+            worksheet.addRow(['ARCV値 (%)', stats.arCV]);
+            worksheet.addRow(['長軸平均粒径', stats.longAxisMean]);
+            worksheet.addRow(['長軸標準偏差', stats.longAxisStdDev]);
+            worksheet.addRow(['長軸CV値 (%)', stats.longAxisCV]);
+            worksheet.addRow(['短軸平均粒径', stats.shortAxisMean]);
+            worksheet.addRow(['短軸標準偏差', stats.shortAxisStdDev]);
+            worksheet.addRow(['短軸CV値 (%)', stats.shortAxisCV]);
+
+            // ファイルを生成してダウンロード
+            const buffer = await workbook.xlsx.writeBuffer();
+            saveAs(new Blob([buffer]), 'crystal_data.xlsx');
         }
     </script>
 </body>
 </html>
-
