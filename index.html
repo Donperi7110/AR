@@ -256,28 +256,31 @@
             const worksheet = workbook.addWorksheet('結晶データ');
 
             // ヘッダー行を追加
-            worksheet.addRow(['データ番号', '長軸', '短軸', 'AR']);
+            worksheet.addRow(['結晶番号', '長軸', '短軸', 'AR']);
+            worksheet.getRow(1).font = { bold: true };
 
             // データ行を追加
             globalResults.forEach((row, index) => {
                 if (index < globalResults.length - 1) {
-                    worksheet.addRow([row.crystalNumber, row.longAxis, row.shortAxis, row.ar]);
+                    worksheet.addRow([row.crystalNumber, row.longAxis, row.shortAxis, { formula: `B${index + 2}/C${index + 2}` }]);
                 }
             });
 
             // 統計情報を追加
             const stats = globalResults[globalResults.length - 1];
+            const rowCount = worksheet.rowCount + 2;
             worksheet.addRow([]);
             worksheet.addRow(['統計情報']);
-            worksheet.addRow(['AR平均値', stats.arMean]);
-            worksheet.addRow(['AR標準偏差', stats.arStdDev]);
-            worksheet.addRow(['ARCV値 (%)', stats.arCV]);
-            worksheet.addRow(['長軸平均粒径', stats.longAxisMean]);
-            worksheet.addRow(['長軸標準偏差', stats.longAxisStdDev]);
-            worksheet.addRow(['長軸CV値 (%)', stats.longAxisCV]);
-            worksheet.addRow(['短軸平均粒径', stats.shortAxisMean]);
-            worksheet.addRow(['短軸標準偏差', stats.shortAxisStdDev]);
-            worksheet.addRow(['短軸CV値 (%)', stats.shortAxisCV]);
+            worksheet.getRow(rowCount).font = { bold: true };
+            worksheet.addRow(['AR平均値', { formula: `AVERAGE(D2:D${globalResults.length})` }]);
+            worksheet.addRow(['AR標準偏差', { formula: `STDEV.P(D2:D${globalResults.length})` }]);
+            worksheet.addRow(['ARCV値 (%)', { formula: `STDEV.P(D2:D${globalResults.length})/AVERAGE(D2:D${globalResults.length})*100` }]);
+            worksheet.addRow(['長軸平均粒径', { formula: `AVERAGE(B2:B${globalResults.length})` }]);
+            worksheet.addRow(['長軸標準偏差', { formula: `STDEV.P(B2:B${globalResults.length})` }]);
+            worksheet.addRow(['長軸CV値 (%)', { formula: `STDEV.P(B2:B${globalResults.length})/AVERAGE(B2:B${globalResults.length})*100` }]);
+            worksheet.addRow(['短軸平均粒径', { formula: `AVERAGE(C2:C${globalResults.length})` }]);
+            worksheet.addRow(['短軸標準偏差', { formula: `STDEV.P(C2:C${globalResults.length})` }]);
+            worksheet.addRow(['短軸CV値 (%)', { formula: `STDEV.P(C2:C${globalResults.length})/AVERAGE(C2:C${globalResults.length})*100` }]);
 
             // ファイルを生成してダウンロード
             const buffer = await workbook.xlsx.writeBuffer();
